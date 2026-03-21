@@ -1,0 +1,3 @@
+# This folder holds pytest-coverage HTML output.
+# Left intentionally without "*" so report files can be committed (e.g. assignments).
+# If coverage.py recreated a "*" rule here, replace it with this file again.

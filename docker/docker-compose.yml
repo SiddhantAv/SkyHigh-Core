@@ -1,0 +1,5 @@
+# Backward compatibility: this file includes the canonical compose at the repo root.
+# Prefer from repository root: docker compose up --build
+
+include:
+  - path: ../docker-compose.yml

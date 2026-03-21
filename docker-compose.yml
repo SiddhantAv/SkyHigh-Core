@@ -1,0 +1,70 @@
+# SkyHigh — full stack for local validation (PostgreSQL, Redis, API, seat expiry worker).
+# Run from the repository root:
+#   docker compose up --build
+# Then apply schema:
+#   docker compose exec api python -m alembic upgrade head
+
+name: skyhigh
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: skyhigh
+      POSTGRES_PASSWORD: skyhigh
+      POSTGRES_DB: skyhigh
+    ports:
+      - "5432:5432"
+    volumes:
+      - skyhigh_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U skyhigh -d skyhigh"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://skyhigh:skyhigh@postgres:5432/skyhigh
+      REDIS_URL: redis://redis:6379/0
+      HOLD_DURATION_SECONDS: "120"
+      LOG_LEVEL: INFO
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  expiry-worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    command: ["python", "-m", "skyhigh.workers.expiry_loop"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://skyhigh:skyhigh@postgres:5432/skyhigh
+      REDIS_URL: redis://redis:6379/0
+      SEAT_EXPIRY_WORKER_INTERVAL_SECONDS: "15"
+      LOG_LEVEL: INFO
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  skyhigh_pg_data:
